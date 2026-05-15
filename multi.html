@@ -489,8 +489,19 @@ function buildPayload() {
   return { bps: companies.map(buildBpForCompany) };
 }
 
+function buildPreviewPayload() {
+  const companies = getSelectedCompanies();
+  if (companies.length === 0) {
+    return {
+      _hint: "Nenhuma empresa selecionada. Marque 1 ou mais acima — o array sera populado com 1 BP por empresa.",
+      bps: [buildBpForCompany("(selecione uma empresa)")],
+    };
+  }
+  return { bps: companies.map(buildBpForCompany) };
+}
+
 function updatePreview() {
-  $("json-preview").textContent = JSON.stringify(buildPayload(), null, 2);
+  $("json-preview").textContent = JSON.stringify(buildPreviewPayload(), null, 2);
 }
 ["full_name", "email", "phone", "street", "house_number", "city", "state"]
   .forEach((id) => $(id).addEventListener("input", updatePreview));
