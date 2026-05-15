@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cadastrar BP no SAP · Staage / Franchise / EasyFlow · Crxate</title>
+<style>
+  :root {
+    --bg: #0A0A0A;
+    --bg-2: #111111;
+    --surface: rgba(255, 255, 255, 0.05);
+    --surface-hover: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.1);
+    --text: #f8fafc;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --accent: #10b981;
+    --accent-dim: rgba(16, 185, 129, 0.15);
+    --danger: #ef4444;
+    --danger-dim: rgba(239, 68, 68, 0.15);
+    --warn: #f59e0b;
+    --warn-dim: rgba(245, 158, 11, 0.15);
+    --indigo: #818cf8;
+    --indigo-dim: rgba(99, 102, 241, 0.15);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+  .container { max-width: 880px; margin: 0 auto; padding: 40px 24px 80px; }
+  header { margin-bottom: 32px; }
+  header h1 { font-size: 28px; margin: 0 0 8px; font-weight: 600; letter-spacing: -0.02em; }
+  header p { color: var(--text-muted); margin: 0; font-size: 14px; }
+  .badge {
+    display: inline-block; padding: 4px 10px;
+    background: var(--indigo-dim); color: var(--indigo);
+    border-radius: 6px; font-size: 12px; font-weight: 500; margin-left: 8px;
+  }
+  .card {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 16px; font-weight: 600; color: var(--text); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
+  label .req { color: var(--danger); margin-left: 2px; }
+  input, select {
+    width: 100%; background: var(--surface);
+    border: 1px solid var(--border); color: var(--text);
+    padding: 10px 12px; border-radius: 8px; font-size: 14px; font-family: inherit;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); background: var(--surface-hover); }
+  input:disabled { opacity: 0.6; cursor: not-allowed; }
+  input[readonly] { background: rgba(255, 255, 255, 0.02); color: var(--text-muted); }
+
+  .company-list { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .company-tile {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px; background: var(--surface);
+    border-radius: 8px; border: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .company-tile:hover { background: var(--surface-hover); }
+  .company-tile.active { border-color: var(--accent); background: var(--accent-dim); }
+  .company-tile input { width: auto; margin: 0; }
+  .company-tile .text strong { display: block; font-size: 14px; }
+  .company-tile .text small { color: var(--text-muted); font-size: 11px; }
+  .company-tile.active .text small { color: var(--accent); }
+
+  .actions { display: flex; gap: 12px; margin-top: 24px; }
+  button {
+    flex: 1; background: var(--accent); color: #000;
+    border: none; padding: 12px 20px; font-size: 14px; font-weight: 600;
+    border-radius: 8px; cursor: pointer; font-family: inherit;
+    transition: opacity 0.15s, transform 0.05s;
+  }
+  button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  button:hover { opacity: 0.9; }
+  button:active { transform: scale(0.99); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .toast {
+    display: none; padding: 16px; border-radius: 8px;
+    margin-top: 16px; font-size: 14px;
+  }
+  .toast.success { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); display: block; }
+  .toast.error   { background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger); display: block; }
+  .toast.warn    { background: var(--warn-dim); border: 1px solid var(--warn); color: var(--warn); display: block; }
+  .toast.info    { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); display: block; }
+  .toast strong { color: inherit; }
+  .toast code {
+    background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;
+    font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 13px;
+  }
+  .result-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .result-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; border-radius: 6px; background: rgba(0,0,0,0.25);
+    font-size: 13px;
+  }
+  .result-row .label-co { font-weight: 600; }
+  .result-row.ok { border-left: 3px solid var(--accent); }
+  .result-row.fail { border-left: 3px solid var(--danger); }
+
+  details {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; margin-top: 16px;
+  }
+  details summary { cursor: pointer; font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  details pre {
+    background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px;
+    font-size: 12px; overflow-x: auto; color: var(--text);
+    margin-top: 12px; line-height: 1.5;
+  }
+  .doc-type {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; margin-left: 8px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .doc-type.pj { background: var(--accent-dim); color: var(--accent); }
+  .doc-type.pf { background: var(--indigo-dim); color: var(--indigo); }
+  .doc-type.invalid { background: var(--danger-dim); color: var(--danger); }
+  footer { text-align: center; margin-top: 40px; color: var(--text-dim); font-size: 12px; }
+  footer a { color: var(--text-muted); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    .grid, .grid-3, .company-list { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Cadastrar Business Partner <span class="badge">Multi-empresa · SAP</span></h1>
+    <p>Cadastra o mesmo BP em uma ou mais empresas (1420 Staage, 1430 Franchise, 1440 EasyFlow) numa única chamada. Para 1410 V4 Company use <a href="cadastrar-bp-v4.html" style="color:var(--accent);">a página do V4</a>.</p>
+  </header>
+
+  <form id="bp-form" autocomplete="off">
+
+    <div class="card">
+      <h2>Empresas destino <span class="req" style="color:var(--danger)">*</span></h2>
+      <div class="company-list">
+        <label class="company-tile" data-code="1420">
+          <input type="checkbox" name="company" value="1420" />
+          <div class="text">
+            <strong>Staage</strong>
+            <small>1420</small>
+          </div>
+        </label>
+        <label class="company-tile" data-code="1430">
+          <input type="checkbox" name="company" value="1430" />
+          <div class="text">
+            <strong>Franchise</strong>
+            <small>1430</small>
+          </div>
+        </label>
+        <label class="company-tile" data-code="1440">
+          <input type="checkbox" name="company" value="1440" />
+          <div class="text">
+            <strong>EasyFlow</strong>
+            <small>1440</small>
+          </div>
+        </label>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button type="button" id="btn-all" class="secondary" style="flex:none; padding:6px 12px; font-size:12px;">Selecionar todas</button>
+        <button type="button" id="btn-none" class="secondary" style="flex:none; padding:6px 12px; font-size:12px;">Limpar seleção</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Documento e identificação</h2>
+      <div class="grid">
+        <div>
+          <label>CNPJ ou CPF <span class="req">*</span> <span id="doc-type" class="doc-type"></span></label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="cnpj_cpf" placeholder="00.000.000/0000-00 ou 000.000.000-00" required style="flex:1;" />
+            <button type="button" id="btn-cnpj" class="secondary" style="flex:none;padding:10px 14px;white-space:nowrap;" disabled title="Disponível só para CNPJ">Buscar CNPJ</button>
+          </div>
+        </div>
+        <div>
+          <label>Tipo (auto)</label>
+          <input type="text" id="tipo_display" readonly placeholder="—" />
+        </div>
+        <div class="full">
+          <label>Nome / Razão Social <span class="req">*</span></label>
+          <input type="text" id="full_name" placeholder="Ex.: Acme Distribuidora LTDA" required />
+        </div>
+        <div>
+          <label>Email</label>
+          <input type="email" id="email" placeholder="contato@empresa.com" />
+        </div>
+        <div>
+          <label>Telefone</label>
+          <input type="tel" id="phone" placeholder="(11) 99999-9999" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Endereço <span class="req" style="color:var(--danger)">*</span></h2>
+      <div class="grid">
+        <div>
+          <label>CEP</label>
+          <input type="text" id="zip_code" placeholder="00000-000" maxlength="9" />
+        </div>
+        <div style="display: flex; align-items: flex-end;">
+          <button type="button" id="btn-cep" class="secondary" style="flex: none; padding: 10px 16px;">Buscar CEP</button>
+        </div>
+        <div class="full">
+          <label>Rua / Logradouro</label>
+          <input type="text" id="street" placeholder="Av. Paulista" />
+        </div>
+        <div>
+          <label>Número</label>
+          <input type="text" id="house_number" placeholder="1000 ou S/N" />
+        </div>
+        <div>
+          <label>Cidade</label>
+          <input type="text" id="city" placeholder="São Paulo" />
+        </div>
+        <div>
+          <label>UF</label>
+          <input type="text" id="state" maxlength="2" placeholder="SP" />
+        </div>
+        <div>
+          <label>País</label>
+          <input type="text" id="country" value="BR" readonly />
+        </div>
+      </div>
+    </div>
+
+    <details>
+      <summary>🔍 Ver payload JSON que será enviado</summary>
+      <pre id="json-preview">{}</pre>
+    </details>
+
+    <div class="actions">
+      <button type="button" id="btn-reset" class="secondary">Limpar</button>
+      <button type="submit" id="btn-submit">🚀 Cadastrar nas empresas selecionadas</button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+  </form>
+
+  <footer>
+    Crxate · V4 Financial OS &nbsp;·&nbsp; Webhook: <code style="background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">v4-cadastrar-bps</code>
+  </footer>
+
+</div>
+
+<script>
+const WEBHOOK_URL = "https://n8n.main.mktlab.app/webhook/v4-cadastrar-bps";
+const API_KEY = "4a359b8cc417413c9a2e1b13a086788b";
+
+const COMPANY_NAMES = {
+  "1420": "Staage",
+  "1430": "Franchise",
+  "1440": "EasyFlow",
+};
+
+const $ = (id) => document.getElementById(id);
+const form = $("bp-form");
+const toast = $("toast");
+
+function showToast(type, html) {
+  toast.className = "toast " + type;
+  toast.innerHTML = html;
+  toast.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function hideToast() { toast.className = "toast"; toast.innerHTML = ""; }
+
+function getSelectedCompanies() {
+  return Array.from(document.querySelectorAll('input[name="company"]:checked')).map((el) => el.value);
+}
+
+// ----- Company tile visual state -----
+document.querySelectorAll(".company-tile").forEach((tile) => {
+  const chk = tile.querySelector('input[type="checkbox"]');
+  const sync = () => tile.classList.toggle("active", chk.checked);
+  chk.addEventListener("change", () => { sync(); updatePreview(); });
+  sync();
+});
+
+$("btn-all").addEventListener("click", () => {
+  document.querySelectorAll('input[name="company"]').forEach((el) => {
+    el.checked = true;
+    el.dispatchEvent(new Event("change"));
+  });
+});
+$("btn-none").addEventListener("click", () => {
+  document.querySelectorAll('input[name="company"]').forEach((el) => {
+    el.checked = false;
+    el.dispatchEvent(new Event("change"));
+  });
+});
+
+// ----- CNPJ/CPF detection -----
+function onlyDigits(s) { return (s || "").replace(/\D/g, ""); }
+function formatCnpjCpf(raw) {
+  const d = onlyDigits(raw);
+  if (d.length <= 11) {
+    return d.replace(/^(\d{3})(\d{0,3})(\d{0,3})(\d{0,2}).*/, (_, a, b, c, e) =>
+      [a, b, c].filter(Boolean).join(".") + (e ? "-" + e : ""));
+  }
+  return d.slice(0, 14).replace(/^(\d{2})(\d{0,3})(\d{0,3})(\d{0,4})(\d{0,2}).*/,
+    (_, a, b, c, d2, e) =>
+      [a, b].filter(Boolean).join(".") +
+      (c ? "." + c : "") +
+      (d2 ? "/" + d2 : "") +
+      (e ? "-" + e : ""));
+}
+function detectDocType(raw) {
+  const d = onlyDigits(raw);
+  if (d.length === 11) return { tipo: "PF", sap_category: "1", sap_tax_type: "BR2", label: "PF" };
+  if (d.length === 14) return { tipo: "PJ", sap_category: "2", sap_tax_type: "BR1", label: "PJ" };
+  return { tipo: null, sap_category: null, sap_tax_type: null, label: null };
+}
+
+$("cnpj_cpf").addEventListener("input", (e) => {
+  e.target.value = formatCnpjCpf(e.target.value);
+  const info = detectDocType(e.target.value);
+  const badge = $("doc-type");
+  const btnCnpj = $("btn-cnpj");
+  if (info.tipo) {
+    badge.className = "doc-type " + info.tipo.toLowerCase();
+    badge.textContent = info.label;
+    $("tipo_display").value = info.tipo === "PJ"
+      ? "PJ · sap_category=2 · BR1 (CNPJ)"
+      : "PF · sap_category=1 · BR2 (CPF)";
+    btnCnpj.disabled = info.tipo !== "PJ";
+    btnCnpj.title = info.tipo === "PJ" ? "Consultar BrasilAPI" : "Disponível só para CNPJ";
+  } else if (onlyDigits(e.target.value).length > 0) {
+    badge.className = "doc-type invalid";
+    badge.textContent = "?";
+    $("tipo_display").value = "Documento incompleto";
+    btnCnpj.disabled = true;
+  } else {
+    badge.className = "doc-type";
+    badge.textContent = "";
+    $("tipo_display").value = "";
+    btnCnpj.disabled = true;
+  }
+  updatePreview();
+});
+
+// ----- BrasilAPI CNPJ lookup -----
+$("btn-cnpj").addEventListener("click", async () => {
+  const cnpj = onlyDigits($("cnpj_cpf").value);
+  if (cnpj.length !== 14) {
+    showToast("warn", "CNPJ inválido. Use 14 dígitos.");
+    return;
+  }
+  hideToast();
+  const btn = $("btn-cnpj");
+  btn.disabled = true;
+  btn.textContent = "Consultando...";
+  try {
+    const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+    if (!resp.ok) {
+      const txt = await resp.text();
+      showToast("warn", `CNPJ não encontrado na Receita (HTTP ${resp.status}). <code>${txt.slice(0, 120)}</code>`);
+      return;
+    }
+    const d = await resp.json();
+    if (d.razao_social) $("full_name").value = d.razao_social;
+    if (d.email && !$("email").value) $("email").value = d.email;
+    if (d.ddd_telefone_1 && !$("phone").value) {
+      const tel = String(d.ddd_telefone_1).replace(/\D/g, "");
+      if (tel.length >= 10) {
+        $("phone").value = `(${tel.slice(0, 2)}) ${tel.slice(2, tel.length - 4)}-${tel.slice(-4)}`;
+      } else {
+        $("phone").value = d.ddd_telefone_1;
+      }
+    }
+    if (d.cep) {
+      const cepDigits = String(d.cep).replace(/\D/g, "").slice(0, 8);
+      $("zip_code").value = cepDigits.length > 5 ? cepDigits.slice(0, 5) + "-" + cepDigits.slice(5) : cepDigits;
+    }
+    const rua = [d.descricao_tipo_de_logradouro, d.logradouro].filter(Boolean).join(" ").trim();
+    if (rua) $("street").value = rua;
+    if (d.numero) $("house_number").value = d.numero;
+    if (d.municipio) $("city").value = d.municipio;
+    if (d.uf) $("state").value = d.uf;
+
+    const situacao = d.descricao_situacao_cadastral || "—";
+    const statusColor = (situacao || "").toUpperCase() === "ATIVA" ? "success" : "warn";
+    showToast(statusColor,
+      `✅ <strong>${d.razao_social || "(sem razão social)"}</strong><br>` +
+      `<small>Situação: <strong>${situacao}</strong> &nbsp;·&nbsp; ` +
+      `Abertura: ${d.data_inicio_atividade || "—"} &nbsp;·&nbsp; ` +
+      `CNAE: ${d.cnae_fiscal_descricao || "—"}</small>`
+    );
+    updatePreview();
+  } catch (err) {
+    showToast("error", `Erro ao consultar BrasilAPI: <code>${err.message}</code>`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Buscar CNPJ";
+    const info = detectDocType($("cnpj_cpf").value);
+    btn.disabled = info.tipo !== "PJ";
+  }
+});
+
+// ----- CEP formatting + lookup -----
+$("zip_code").addEventListener("input", (e) => {
+  const d = onlyDigits(e.target.value).slice(0, 8);
+  e.target.value = d.length > 5 ? d.slice(0, 5) + "-" + d.slice(5) : d;
+  updatePreview();
+});
+
+$("btn-cep").addEventListener("click", async () => {
+  const cep = onlyDigits($("zip_code").value);
+  if (cep.length !== 8) {
+    showToast("warn", "CEP inválido. Use 8 dígitos.");
+    return;
+  }
+  hideToast();
+  $("btn-cep").disabled = true;
+  $("btn-cep").textContent = "Buscando...";
+  try {
+    const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const data = await resp.json();
+    if (data.erro) {
+      showToast("warn", "CEP não encontrado no ViaCEP.");
+    } else {
+      $("street").value = data.logradouro || "";
+      $("city").value = data.localidade || "";
+      $("state").value = data.uf || "";
+      $("house_number").focus();
+      updatePreview();
+    }
+  } catch (err) {
+    showToast("error", "Erro ao consultar ViaCEP: " + err.message);
+  } finally {
+    $("btn-cep").disabled = false;
+    $("btn-cep").textContent = "Buscar CEP";
+  }
+});
+
+// ----- Payload builder -----
+function buildBpForCompany(companyCode) {
+  const docInfo = detectDocType($("cnpj_cpf").value);
+  const cnpjCpf = onlyDigits($("cnpj_cpf").value);
+  const fullName = $("full_name").value.trim();
+  const isPj = docInfo.tipo === "PJ";
+  let firstName = null, lastName = null;
+  if (!isPj && fullName) {
+    const parts = fullName.split(/\s+/);
+    firstName = parts[0] || null;
+    lastName = parts.slice(1).join(" ") || null;
+  }
+  const phone = $("phone").value.trim() || null;
+  return {
+    company_code: companyCode,
+    document_number: cnpjCpf || null,
+    cnpj_cpf: cnpjCpf || null,
+    full_name: fullName || "",
+    first_name: firstName,
+    last_name: lastName,
+    sap_category: docInfo.sap_category,
+    sap_tax_type: docInfo.sap_tax_type,
+    email: $("email").value.trim() || null,
+    phone_full: phone,
+    zip_code: $("zip_code").value.trim() || null,
+    street: $("street").value.trim() || null,
+    house_number: $("house_number").value.trim() || "S/N",
+    city: $("city").value.trim() || null,
+    state: $("state").value.trim().toUpperCase() || null,
+    country: "BR",
+    source_id: cnpjCpf ? `${cnpjCpf}-${companyCode}` : null,
+    address_is_fallback: false,
+  };
+}
+
+function buildPayload() {
+  const companies = getSelectedCompanies();
+  return { bps: companies.map(buildBpForCompany) };
+}
+
+function updatePreview() {
+  $("json-preview").textContent = JSON.stringify(buildPayload(), null, 2);
+}
+["full_name", "email", "phone", "street", "house_number", "city", "state"]
+  .forEach((id) => $(id).addEventListener("input", updatePreview));
+updatePreview();
+
+// ----- Submit -----
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideToast();
+  const companies = getSelectedCompanies();
+  if (companies.length === 0) {
+    showToast("error", "Selecione pelo menos uma empresa destino.");
+    return;
+  }
+
+  const docInfo = detectDocType($("cnpj_cpf").value);
+  if (!docInfo.tipo) {
+    showToast("error", "CNPJ/CPF inválido. Use 11 dígitos (CPF) ou 14 (CNPJ).");
+    return;
+  }
+  const fullName = $("full_name").value.trim();
+  if (!fullName) {
+    showToast("error", "Nome / Razão Social é obrigatório.");
+    return;
+  }
+  const zip = $("zip_code").value.trim();
+  const street = $("street").value.trim();
+  const city = $("city").value.trim();
+  const state = $("state").value.trim();
+  if (!zip || !street || !city || !state) {
+    showToast("warn", "Endereço incompleto. Preencha CEP, rua, cidade e UF.");
+    return;
+  }
+
+  const payload = buildPayload();
+  const btn = $("btn-submit");
+  btn.disabled = true;
+  btn.textContent = `Enviando ${companies.length} BP(s) ao SAP...`;
+
+  try {
+    const resp = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-API-Key": API_KEY,
+      },
+      body: JSON.stringify(payload),
+    });
+    const text = await resp.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+    if (Array.isArray(data) && data.length === 1) data = data[0];
+
+    if (!resp.ok) {
+      showToast("error", `❌ HTTP ${resp.status}: <code>${(text || "").slice(0, 300)}</code>`);
+      return;
+    }
+
+    const details = Array.isArray(data.details) ? data.details : (data.details ? [data.details] : []);
+    const succeeded = data.succeeded ?? details.filter((d) => d && d.sap_bp_number).length;
+    const errored = data.errored ?? details.filter((d) => d && !d.sap_bp_number).length;
+
+    let rows = "";
+    if (details.length === companies.length) {
+      details.forEach((d, idx) => {
+        const code = d.company_code || companies[idx];
+        const name = COMPANY_NAMES[code] || code;
+        if (d.sap_bp_number) {
+          rows += `<div class="result-row ok"><span class="label-co">${name} <small style="color:var(--text-muted)">(${code})</small></span><span>✅ BP <code>${d.sap_bp_number}</code> ${d.tax_ok ? "· Tax ✅" : (d.tax_ok === false ? "· Tax ⚠️" : "")}</span></div>`;
+        } else {
+          rows += `<div class="result-row fail"><span class="label-co">${name} <small style="color:var(--text-muted)">(${code})</small></span><span>❌ <code>${(d.error || "sem detalhes").toString().slice(0, 180)}</code></span></div>`;
+        }
+      });
+    } else {
+      rows = `<pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;">${JSON.stringify(data, null, 2).slice(0, 1500)}</pre>`;
+    }
+
+    const allOk = succeeded === companies.length && errored === 0;
+    const toastType = allOk ? "success" : (succeeded > 0 ? "warn" : "error");
+    const headline = allOk
+      ? `✅ <strong>${succeeded} BP(s) cadastrado(s) em todas as empresas selecionadas.</strong>`
+      : `⚠️ <strong>${succeeded} sucesso(s), ${errored} erro(s).</strong>`;
+    showToast(toastType, headline + `<div class="result-list">${rows}</div>`);
+
+    if (allOk) {
+      $("cnpj_cpf").value = "";
+      $("full_name").value = "";
+      $("email").value = "";
+      $("phone").value = "";
+      $("doc-type").className = "doc-type";
+      $("doc-type").textContent = "";
+      $("tipo_display").value = "";
+      updatePreview();
+      $("cnpj_cpf").focus();
+    }
+  } catch (err) {
+    showToast("error", `❌ Erro de conexão: <code>${err.message}</code>`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🚀 Cadastrar nas empresas selecionadas";
+  }
+});
+
+$("btn-reset").addEventListener("click", () => {
+  form.reset();
+  document.querySelectorAll(".company-tile").forEach((t) => t.classList.remove("active"));
+  $("doc-type").className = "doc-type";
+  $("doc-type").textContent = "";
+  $("tipo_display").value = "";
+  $("country").value = "BR";
+  hideToast();
+  updatePreview();
+});
+</script>
+</body>
+</html>
