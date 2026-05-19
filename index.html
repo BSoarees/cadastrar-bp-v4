@@ -389,6 +389,10 @@
             <input type="text" id="house_number" placeholder="1000 ou S/N" />
           </div>
           <div>
+            <label>Bairro</label>
+            <input type="text" id="neighborhood" placeholder="Bela Vista" />
+          </div>
+          <div>
             <label>Cidade</label>
             <input type="text" id="city" placeholder="São Paulo" />
           </div>
@@ -436,7 +440,7 @@
         <br>• <code>cnpj_cpf</code> <span style="color:var(--danger)">obrigatório</span> — também aceita <code>cnpj</code>, <code>cpf</code>, <code>documento</code>
         <br>• <code>full_name</code> (opcional) — <code>razao_social</code>, <code>nome</code>
         <br>• <code>email</code>, <code>phone</code> / <code>telefone</code>
-        <br>• <code>zip_code</code> / <code>cep</code>, <code>street</code> / <code>rua</code>, <code>house_number</code> / <code>numero</code>, <code>city</code> / <code>cidade</code>, <code>state</code> / <code>uf</code>
+        <br>• <code>zip_code</code> / <code>cep</code>, <code>street</code> / <code>rua</code>, <code>house_number</code> / <code>numero</code>, <code>neighborhood</code> / <code>bairro</code>, <code>city</code> / <code>cidade</code>, <code>state</code> / <code>uf</code>
         <br><br>
         <strong>Como funciona:</strong> as colunas preenchidas <em>sobrescrevem</em> os dados da Receita; as vazias são preenchidas pela BrasilAPI (só para CNPJ). CPFs sem dados precisam de nome/endereço na planilha ou fallback V4.
       </div>
@@ -520,6 +524,7 @@ const FALLBACK_V4 = {
   zip_code: "13054-709",
   street: "R. Sergio Fernandes Borges Soares",
   house_number: "1000",
+  neighborhood: "Cidade Universitaria",
   city: "Campinas",
   state: "SP",
 };
@@ -618,6 +623,7 @@ function applyReceitaToObj(target, d) {
     if (rua) out.street = rua;
   }
   if (!out.house_number && d.numero) out.house_number = String(d.numero);
+  if (!out.neighborhood && d.bairro) out.neighborhood = d.bairro;
   if (!out.city && d.municipio) out.city = d.municipio;
   if (!out.state && d.uf) out.state = d.uf;
   out._receita_situacao = d.descricao_situacao_cadastral || null;
@@ -636,15 +642,16 @@ function buildBpPayload(row, { useFallbackIfMissing = false, source_id, company_
   }
 
   let zip = row.zip_code, street = row.street, num = row.house_number,
-      city = row.city, state = row.state;
+      bairro = row.neighborhood, city = row.city, state = row.state;
   const missing = !zip || !street || !city || !state;
   const usedFallback = missing && useFallbackIfMissing;
   if (usedFallback) {
-    zip   = zip   || FALLBACK_V4.zip_code;
-    street= street|| FALLBACK_V4.street;
-    num   = num   || FALLBACK_V4.house_number;
-    city  = city  || FALLBACK_V4.city;
-    state = state || FALLBACK_V4.state;
+    zip    = zip    || FALLBACK_V4.zip_code;
+    street = street || FALLBACK_V4.street;
+    num    = num    || FALLBACK_V4.house_number;
+    bairro = bairro || FALLBACK_V4.neighborhood;
+    city   = city   || FALLBACK_V4.city;
+    state  = state  || FALLBACK_V4.state;
   }
 
   const cc = company_code || "1410";
@@ -665,6 +672,7 @@ function buildBpPayload(row, { useFallbackIfMissing = false, source_id, company_
       zip_code: (zip || "").trim() || null,
       street: (street || "").trim() || null,
       house_number: (num || "").trim() || "S/N",
+      neighborhood: (bairro || "").trim() || null,
       city: (city || "").trim() || null,
       state: ((state || "").trim().toUpperCase()) || null,
       country: "BR",
@@ -740,6 +748,7 @@ $("btn-cnpj").addEventListener("click", async () => {
       const rua = [d.descricao_tipo_de_logradouro, d.logradouro].filter(Boolean).join(" ").trim();
       if (rua) $("street").value = rua;
       if (d.numero) $("house_number").value = d.numero;
+      if (d.bairro) $("neighborhood").value = d.bairro;
       if (d.municipio) $("city").value = d.municipio;
       if (d.uf) $("state").value = d.uf;
     }
@@ -777,6 +786,7 @@ $("btn-cep").addEventListener("click", async () => {
     if (data.erro) { showToast("warn", "CEP não encontrado no ViaCEP."); }
     else {
       $("street").value = data.logradouro || "";
+      $("neighborhood").value = data.bairro || "";
       $("city").value = data.localidade || "";
       $("state").value = data.uf || "";
       $("house_number").focus();
@@ -790,11 +800,12 @@ $("btn-cep").addEventListener("click", async () => {
 });
 
 $("use_fallback").addEventListener("change", (e) => {
-  const fields = ["zip_code", "street", "house_number", "city", "state"];
+  const fields = ["zip_code", "street", "house_number", "neighborhood", "city", "state"];
   if (e.target.checked) {
     $("zip_code").value = FALLBACK_V4.zip_code;
     $("street").value = FALLBACK_V4.street;
     $("house_number").value = FALLBACK_V4.house_number;
+    $("neighborhood").value = FALLBACK_V4.neighborhood || "";
     $("city").value = FALLBACK_V4.city;
     $("state").value = FALLBACK_V4.state;
     fields.forEach((f) => $(f).readOnly = true);
@@ -815,6 +826,7 @@ function buildAvulsoRow() {
     zip_code: $("zip_code").value,
     street: $("street").value,
     house_number: $("house_number").value,
+    neighborhood: $("neighborhood").value,
     city: $("city").value,
     state: $("state").value,
   };
@@ -840,7 +852,7 @@ function updatePreview() {
   const preview = payloads.length === 1 ? payloads[0] : { bps: payloads };
   $("json-preview").textContent = JSON.stringify(preview, null, 2);
 }
-["full_name", "email", "phone", "street", "house_number", "city", "state"]
+["full_name", "email", "phone", "street", "house_number", "neighborhood", "city", "state"]
   .forEach((id) => $(id).addEventListener("input", updatePreview));
 updatePreview();
 
@@ -922,7 +934,7 @@ $("btn-reset").addEventListener("click", () => {
   form.reset();
   $("doc-type").className = "doc-type"; $("doc-type").textContent = "";
   $("tipo_display").value = ""; $("country").value = "BR";
-  ["zip_code", "street", "house_number", "city", "state"].forEach((f) => $(f).readOnly = false);
+  ["zip_code", "street", "house_number", "neighborhood", "city", "state"].forEach((f) => $(f).readOnly = false);
   $("btn-cep").disabled = false; hideToast(); updatePreview();
 });
 
@@ -937,6 +949,7 @@ const COLUMN_ALIASES = {
   zip_code:     ["zip_code", "cep", "zip"],
   street:       ["street", "rua", "logradouro", "endereco", "endereço"],
   house_number: ["house_number", "numero", "número", "num", "number"],
+  neighborhood: ["neighborhood", "bairro", "district"],
   city:         ["city", "cidade", "municipio", "município"],
   state:        ["state", "uf", "estado"],
 };
@@ -1320,7 +1333,7 @@ $("btn-clear-import").addEventListener("click", () => {
 // Export CSV
 $("btn-export").addEventListener("click", () => {
   if (!IMPORT_ROWS.length) return;
-  const cols = ["linha", "company_code", "company_name", "cnpj_cpf", "tipo", "full_name", "email", "phone", "zip_code", "street", "house_number", "city", "state", "status_receita", "status_sap", "sap_bp_number", "already_exists", "tax_ok", "error"];
+  const cols = ["linha", "company_code", "company_name", "cnpj_cpf", "tipo", "full_name", "email", "phone", "zip_code", "street", "house_number", "neighborhood", "city", "state", "status_receita", "status_sap", "sap_bp_number", "already_exists", "tax_ok", "error"];
   const lines = [cols.join(",")];
   for (const r of IMPORT_ROWS) {
     const tipo = detectDocType(r.row.cnpj_cpf).tipo || "";
@@ -1336,6 +1349,7 @@ $("btn-export").addEventListener("click", () => {
       r.row.zip_code || "",
       r.row.street || "",
       r.row.house_number || "",
+      r.row.neighborhood || "",
       r.row.city || "",
       r.row.state || "",
       r.status_receita || "",
@@ -1366,7 +1380,7 @@ function csvCell(v) {
 // ===== Templates =====
 const TEMPLATE_COLUMNS = [
   "cnpj_cpf", "full_name", "email", "phone",
-  "zip_code", "street", "house_number", "city", "state"
+  "zip_code", "street", "house_number", "neighborhood", "city", "state"
 ];
 const TEMPLATE_SAMPLE_ROWS = [
   {
@@ -1377,6 +1391,7 @@ const TEMPLATE_SAMPLE_ROWS = [
     zip_code: "70073-901",
     street: "Setor Bancario Sul Quadra 1 Bloco G",
     house_number: "S/N",
+    neighborhood: "Asa Sul",
     city: "Brasilia",
     state: "DF",
   },
@@ -1388,6 +1403,7 @@ const TEMPLATE_SAMPLE_ROWS = [
     zip_code: "",
     street: "",
     house_number: "",
+    neighborhood: "",
     city: "",
     state: "",
   },
@@ -1452,7 +1468,7 @@ $("btn-template-xlsx").addEventListener("click", () => {
 
   ws["!cols"] = [
     { wch: 20 }, { wch: 34 }, { wch: 28 }, { wch: 20 },
-    { wch: 12 }, { wch: 34 }, { wch: 12 }, { wch: 20 }, { wch: 6 },
+    { wch: 12 }, { wch: 34 }, { wch: 12 }, { wch: 22 }, { wch: 20 }, { wch: 6 },
   ];
   ws["!rows"] = [{ hpt: 24 }];
 
@@ -1493,6 +1509,7 @@ $("btn-template-xlsx").addEventListener("click", () => {
     ["zip_code",     "CEP. Ex.: 01310-100."],
     ["street",       "Rua / logradouro."],
     ["house_number", "Número. Use S/N se não tiver."],
+    ["neighborhood", "Bairro. Vem da Receita (CNPJ) ou ViaCEP automaticamente se vazio."],
     ["city",         "Cidade."],
     ["state",        "UF (2 letras maiúsculas). Ex.: SP."],
     [""],
