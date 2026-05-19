@@ -1554,6 +1554,42 @@ $("btn-template-csv").addEventListener("click", () => {
   triggerDownload(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }),
     "template-cadastro-bps-v4.csv");
 });
+
+// ============================================================================
+// Prefill via query string — usado por deeplinks (ex.: emitir-ov-staage)
+// Aceita: ?doc=12345678000100&nome=Fulano&company=1420&email=&phone=&platform=
+// ============================================================================
+(function prefillFromQuery(){
+  const qs = new URLSearchParams(window.location.search);
+  const doc = (qs.get("doc") || qs.get("cnpj") || qs.get("cpf") || "").replace(/\D/g, "");
+  const nome = qs.get("nome") || qs.get("name") || "";
+  const company = qs.get("company") || qs.get("empresa") || "";
+  const email = qs.get("email") || "";
+  const phone = qs.get("phone") || "";
+  if (!doc && !nome && !company) return;
+
+  if (company) {
+    const cb = document.querySelector(`input[name="company"][value="${company}"]`);
+    if (cb) { cb.checked = true; cb.dispatchEvent(new Event("change", {bubbles:true})); }
+  }
+  if (doc) {
+    const f = $("cnpj_cpf");
+    f.value = doc.length === 14
+      ? doc.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
+      : doc.length === 11
+        ? doc.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")
+        : doc;
+    f.dispatchEvent(new Event("input", {bubbles:true}));
+    f.dispatchEvent(new Event("blur", {bubbles:true}));
+  }
+  if (nome) { $("full_name").value = nome; }
+  if (email) { $("email").value = email; }
+  if (phone) { $("phone").value = phone; }
+
+  if (doc && doc.length === 14) {
+    setTimeout(() => { const btn = $("btn-cnpj"); if (btn && !btn.disabled) btn.click(); }, 250);
+  }
+})();
 </script>
 </body>
 </html>
