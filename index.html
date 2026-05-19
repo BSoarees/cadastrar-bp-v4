@@ -1604,6 +1604,87 @@ $("btn-template-csv").addEventListener("click", () => {
     setTimeout(() => { const btn = $("btn-cnpj"); if (btn && !btn.disabled) btn.click(); }, 250);
   }
 })();
+
+// ============================================================================
+// Handoff em massa via localStorage — usado por emitir-ov-staage
+// Lê localStorage["bp_handoff_v1"] = { source, company_code, rows:[{cnpj_cpf,full_name,...}] }
+// ============================================================================
+(function consumeBpHandoff(){
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.get("handoff") !== "1") return;
+  let payload;
+  try {
+    const raw = localStorage.getItem("bp_handoff_v1");
+    if (!raw) return;
+    payload = JSON.parse(raw);
+  } catch(e){ console.error("handoff parse error", e); return; }
+  if (!payload || !Array.isArray(payload.rows) || payload.rows.length === 0) return;
+
+  // Garante empresa marcada (vinda de query string ou do payload)
+  const cc = qs.get("company") || payload.company_code;
+  if (cc) {
+    const cb = document.querySelector(`input[name="company"][value="${cc}"]`);
+    if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event("change", {bubbles:true})); }
+  }
+
+  const companies = (typeof getSelectedCompanies === "function") ? getSelectedCompanies() : [cc].filter(Boolean);
+  if (!companies.length) { console.warn("handoff: nenhuma empresa marcada"); return; }
+
+  IMPORT_ROWS = [];
+  let line = 0;
+  for (const r of payload.rows) {
+    if (!r.cnpj_cpf || !onlyDigits(r.cnpj_cpf)) continue;
+    line++;
+    for (const ccx of companies) {
+      IMPORT_ROWS.push({
+        line,
+        company_code: ccx,
+        row: {
+          cnpj_cpf: String(r.cnpj_cpf).trim(),
+          full_name: r.full_name || "",
+          email: r.email || "",
+          phone: r.phone || "",
+          zip_code: r.zip_code || "",
+          street: r.street || "",
+          house_number: r.house_number || "",
+          neighborhood: r.neighborhood || "",
+          city: r.city || "",
+          state: r.state || ""
+        },
+        status_receita: "pending",
+        status_sap: "pending",
+        sap_bp_number: null,
+        error: null,
+        _meta: { from_handoff: true, source: payload.source || "handoff" }
+      });
+    }
+  }
+  if (!IMPORT_ROWS.length) return;
+
+  // Dedup local (cnpj|empresa)
+  const seen = new Map();
+  IMPORT_ROWS.forEach((item, idx) => {
+    const key = onlyDigits(item.row.cnpj_cpf) + "|" + item.company_code;
+    if (seen.has(key)) {
+      item.status_sap = "skip";
+      item.error = `Duplicado no handoff (linha ${IMPORT_ROWS[seen.get(key)].line}) p/ ${COMPANY_NAMES[item.company_code]}`;
+      item._meta.dup_in_sheet = true;
+    } else seen.set(key, idx);
+  });
+
+  // Switch pra aba Import e mostra preview
+  setTimeout(() => {
+    document.querySelector('.tab[data-tab="import"]').click();
+    const card = $("card-preview"); if (card) card.style.display = "block";
+    const distinctLines = new Set(IMPORT_ROWS.map(r => r.line)).size;
+    const previewEl = $("preview-count");
+    if (previewEl) previewEl.textContent = `(${distinctLines} BP(s) × ${companies.length} empresa(s) = ${IMPORT_ROWS.length} cadastro(s) · vindos de ${payload.source||"dashboard"})`;
+    if (typeof renderTable === "function") renderTable();
+    showImportToast("ok", `✅ <strong>${distinctLines} BP(s)</strong> carregados do dashboard ${payload.source||""}. Revise e clique "Cadastrar todos".`);
+    // Consome o handoff (limpa pra não reentrar se recarregar)
+    localStorage.removeItem("bp_handoff_v1");
+  }, 200);
+})();
 </script>
 </body>
 </html>
