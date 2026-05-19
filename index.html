@@ -1566,7 +1566,13 @@ $("btn-template-csv").addEventListener("click", () => {
   const company = qs.get("company") || qs.get("empresa") || "";
   const email = qs.get("email") || "";
   const phone = qs.get("phone") || "";
-  if (!doc && !nome && !company) return;
+  const zip = (qs.get("cep") || qs.get("zip") || "").replace(/\D/g, "");
+  const street = qs.get("rua") || qs.get("street") || "";
+  const houseNumber = qs.get("numero") || qs.get("number") || "";
+  const neighborhood = qs.get("bairro") || qs.get("neighborhood") || "";
+  const city = qs.get("cidade") || qs.get("city") || "";
+  const state = qs.get("uf") || qs.get("state") || "";
+  if (!doc && !nome && !company && !email) return;
 
   if (company) {
     const cb = document.querySelector(`input[name="company"][value="${company}"]`);
@@ -1582,11 +1588,19 @@ $("btn-template-csv").addEventListener("click", () => {
     f.dispatchEvent(new Event("input", {bubbles:true}));
     f.dispatchEvent(new Event("blur", {bubbles:true}));
   }
-  if (nome) { $("full_name").value = nome; }
-  if (email) { $("email").value = email; }
-  if (phone) { $("phone").value = phone; }
+  if (nome) $("full_name").value = nome;
+  if (email) $("email").value = email;
+  if (phone) $("phone").value = phone;
+  if (zip)   $("zip_code").value = zip.length===8 ? zip.slice(0,5)+"-"+zip.slice(5) : zip;
+  if (street) $("street").value = street;
+  if (houseNumber) $("house_number").value = houseNumber;
+  if (neighborhood) $("neighborhood").value = neighborhood;
+  if (city) $("city").value = city;
+  if (state) $("state").value = state.toUpperCase().slice(0,2);
 
-  if (doc && doc.length === 14) {
+  // Se já veio endereço completo do deeplink, não precisa puxar Receita. Só dispara
+  // Buscar CNPJ se for CNPJ E não veio endereço.
+  if (doc && doc.length === 14 && !street) {
     setTimeout(() => { const btn = $("btn-cnpj"); if (btn && !btn.disabled) btn.click(); }, 250);
   }
 })();
