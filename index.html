@@ -464,7 +464,7 @@
 
 </div>
 
-<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
 const WEBHOOK_URL = "https://n8n.main.mktlab.app/webhook/v4-cadastrar-bps";
 const API_KEY = "4a359b8cc417413c9a2e1b13a086788b";
@@ -837,7 +837,9 @@ const COLUMN_ALIASES = {
 
 function normalizeHeader(h) {
   return (h || "").toString().trim().toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "");
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/\s*\*+\s*$/, "")  // remove asterisco final (marcador de obrigatório)
+    .trim();
 }
 
 function mapHeaders(headers) {
@@ -1227,27 +1229,91 @@ function triggerDownload(blob, filename) {
 }
 
 $("btn-template-xlsx").addEventListener("click", () => {
-  const ws = XLSX.utils.json_to_sheet(TEMPLATE_SAMPLE_ROWS, { header: TEMPLATE_COLUMNS });
-  // Largura sugerida das colunas
+  // Estilos
+  const headerReq = {
+    font: { bold: true, color: { rgb: "FFFFFFFF" }, sz: 11 },
+    fill: { patternType: "solid", fgColor: { rgb: "FFDC2626" } }, // vermelho
+    alignment: { horizontal: "center", vertical: "center" },
+    border: borderAll("FFB91C1C"),
+  };
+  const headerOpt = {
+    font: { bold: true, color: { rgb: "FFE5E7EB" }, sz: 11 },
+    fill: { patternType: "solid", fgColor: { rgb: "FF374151" } }, // cinza escuro
+    alignment: { horizontal: "center", vertical: "center" },
+    border: borderAll("FF1F2937"),
+  };
+  const cellReq = {
+    fill: { patternType: "solid", fgColor: { rgb: "FFFEE2E2" } }, // vermelho claro
+    border: borderAll("FFFCA5A5"),
+  };
+  const cellOpt = { border: borderAll("FFE5E7EB") };
+
+  // Monta sheet manualmente com estilos
+  const REQUIRED = new Set(["cnpj_cpf"]);
+  const headerRow = TEMPLATE_COLUMNS.map((c) =>
+    REQUIRED.has(c) ? c + " *" : c
+  );
+
+  const aoa = [headerRow];
+  for (const r of TEMPLATE_SAMPLE_ROWS) {
+    aoa.push(TEMPLATE_COLUMNS.map((c) => r[c] ?? ""));
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Aplica estilos célula por célula
+  for (let c = 0; c < TEMPLATE_COLUMNS.length; c++) {
+    const col = TEMPLATE_COLUMNS[c];
+    const isReq = REQUIRED.has(col);
+    // header (linha 0)
+    const headerAddr = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[headerAddr]) ws[headerAddr].s = isReq ? headerReq : headerOpt;
+    // demais linhas
+    for (let r = 1; r < aoa.length; r++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) ws[addr] = { v: "", t: "s" };
+      ws[addr].s = isReq ? cellReq : cellOpt;
+      // CNPJ como texto pra não perder zero à esquerda
+      if (col === "cnpj_cpf") { ws[addr].t = "s"; ws[addr].z = "@"; }
+    }
+  }
+
   ws["!cols"] = [
-    { wch: 18 }, { wch: 32 }, { wch: 26 }, { wch: 18 },
-    { wch: 12 }, { wch: 32 }, { wch: 10 }, { wch: 18 }, { wch: 4 },
+    { wch: 20 }, { wch: 34 }, { wch: 28 }, { wch: 20 },
+    { wch: 12 }, { wch: 34 }, { wch: 12 }, { wch: 20 }, { wch: 6 },
   ];
+  ws["!rows"] = [{ hpt: 24 }];
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "BPs");
 
-  // Aba de instruções
-  const instr = [
+  // ----- Aba de instruções (com legenda colorida) -----
+  const titleStyle = { font: { bold: true, sz: 14, color: { rgb: "FF111827" } } };
+  const sectionStyle = { font: { bold: true, sz: 12, color: { rgb: "FF111827" } } };
+  const legendReq = {
+    fill: { patternType: "solid", fgColor: { rgb: "FFFEE2E2" } },
+    font: { bold: true, color: { rgb: "FFB91C1C" } },
+    border: borderAll("FFFCA5A5"),
+  };
+  const legendOpt = {
+    fill: { patternType: "solid", fgColor: { rgb: "FFF3F4F6" } },
+    font: { color: { rgb: "FF374151" } },
+    border: borderAll("FFE5E7EB"),
+  };
+
+  const instrAoa = [
     ["Template de importação de BPs no SAP V4 (1410)"],
     [""],
+    ["Legenda:"],
+    ["OBRIGATÓRIO", "Coluna marcada em vermelho na aba BPs. Sem preenchimento, a linha é ignorada."],
+    ["opcional", "Cinza. Se vazio, busca na BrasilAPI (só CNPJ). Se preenchido, sobrescreve a Receita."],
+    [""],
     ["Como usar:"],
-    ["1. Preencha pelo menos a coluna cnpj_cpf (CNPJ com 14 dígitos ou CPF com 11)."],
-    ["2. As demais colunas são opcionais — se vazias, são preenchidas pela BrasilAPI (só CNPJ)."],
-    ["3. Se preenchidas, sobrescrevem o que vem da Receita."],
-    ["4. Salve como .xlsx ou .csv e faça upload no site."],
+    ["1.", "Preencha pelo menos a coluna cnpj_cpf (CNPJ com 14 dígitos ou CPF com 11)."],
+    ["2.", "As demais colunas são opcionais."],
+    ["3.", "Salve como .xlsx ou .csv e faça upload no site."],
     [""],
     ["Colunas:"],
-    ["cnpj_cpf",     "Obrigatório. Aceita com ou sem máscara. CNPJ=14 dígitos, CPF=11."],
+    ["cnpj_cpf *",   "OBRIGATÓRIO. Aceita com ou sem máscara. CNPJ=14 dígitos, CPF=11."],
     ["full_name",    "Nome ou Razão Social. Para PJ, vem da Receita se vazio."],
     ["email",        "Opcional."],
     ["phone",        "Telefone com DDD. Ex.: (11) 99999-9999."],
@@ -1258,26 +1324,40 @@ $("btn-template-xlsx").addEventListener("click", () => {
     ["state",        "UF (2 letras maiúsculas). Ex.: SP."],
     [""],
     ["Aliases aceitos (case insensitive, sem acento):"],
-    ["• cnpj_cpf  →  cnpj, cpf, documento, doc"],
-    ["• full_name →  razao_social, razão social, nome"],
-    ["• phone     →  telefone, tel, celular"],
-    ["• zip_code  →  cep"],
-    ["• street    →  rua, logradouro, endereco"],
-    ["• house_number → numero, num, number"],
-    ["• city      →  cidade, municipio"],
-    ["• state     →  uf, estado"],
+    ["cnpj_cpf",      "cnpj, cpf, documento, doc"],
+    ["full_name",     "razao_social, razão social, nome"],
+    ["phone",         "telefone, tel, celular"],
+    ["zip_code",      "cep"],
+    ["street",        "rua, logradouro, endereco"],
+    ["house_number",  "numero, num, number"],
+    ["city",          "cidade, municipio"],
+    ["state",         "uf, estado"],
   ];
-  const wsInstr = XLSX.utils.aoa_to_sheet(instr);
-  wsInstr["!cols"] = [{ wch: 20 }, { wch: 70 }];
+  const wsInstr = XLSX.utils.aoa_to_sheet(instrAoa);
+  wsInstr["!cols"] = [{ wch: 22 }, { wch: 70 }];
+  // Estilos da aba de instruções
+  if (wsInstr["A1"]) wsInstr["A1"].s = titleStyle;
+  ["A3", "A7", "A12", "A23"].forEach((addr) => { if (wsInstr[addr]) wsInstr[addr].s = sectionStyle; });
+  if (wsInstr["A4"]) wsInstr["A4"].s = legendReq;
+  if (wsInstr["A5"]) wsInstr["A5"].s = legendOpt;
+  if (wsInstr["A13"]) wsInstr["A13"].s = legendReq;
+
   XLSX.utils.book_append_sheet(wb, wsInstr, "Instruções");
 
-  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx", cellStyles: true });
   triggerDownload(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
     "template-cadastro-bps-v4.xlsx");
 });
 
+function borderAll(rgb) {
+  const side = { style: "thin", color: { rgb } };
+  return { top: side, bottom: side, left: side, right: side };
+}
+
 $("btn-template-csv").addEventListener("click", () => {
-  const lines = [TEMPLATE_COLUMNS.join(",")];
+  const REQUIRED = new Set(["cnpj_cpf"]);
+  const headers = TEMPLATE_COLUMNS.map((c) => REQUIRED.has(c) ? c + " *" : c);
+  const lines = [headers.join(",")];
   for (const r of TEMPLATE_SAMPLE_ROWS) {
     lines.push(TEMPLATE_COLUMNS.map((c) => csvCell(r[c])).join(","));
   }
