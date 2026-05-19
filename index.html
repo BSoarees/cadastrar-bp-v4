@@ -888,6 +888,7 @@ function renderTable() {
     const sapBadge = pillFor(r.status_sap, {
       pending: "—", running: "enviando…",
       ok: "✅ cadastrado", fail: "❌ erro",
+      skip: "↪ duplicado",
     });
 
     const tr = document.createElement("tr");
@@ -966,8 +967,35 @@ async function handleFile(file) {
       showImportToast("error", "Nenhuma linha válida (faltou CNPJ/CPF em todas).");
       return;
     }
+
+    // Dedup local: marca duplicatas dentro da própria planilha
+    const seen = new Map(); // cnpj_normalizado -> primeira linha (1-based)
+    let dupCount = 0;
+    IMPORT_ROWS.forEach((item, idx) => {
+      const key = onlyDigits(item.row.cnpj_cpf);
+      const lineNum = idx + 1;
+      if (seen.has(key)) {
+        item.status_sap = "skip";
+        item.error = `Duplicado na planilha — já aparece na linha ${seen.get(key)}`;
+        item._meta.dup_in_sheet = true;
+        dupCount++;
+      } else {
+        seen.set(key, lineNum);
+      }
+    });
+
     $("card-preview").style.display = "block";
-    $("preview-count").textContent = `(${IMPORT_ROWS.length} linha(s) carregada(s)` + (skipped ? ` · ${skipped} ignorada(s) sem CNPJ/CPF` : "") + `)`;
+    let countMsg = `(${IMPORT_ROWS.length} linha(s) carregada(s)`;
+    if (skipped) countMsg += ` · ${skipped} ignorada(s) sem CNPJ/CPF`;
+    if (dupCount) countMsg += ` · ${dupCount} duplicada(s) na planilha`;
+    countMsg += `)`;
+    $("preview-count").textContent = countMsg;
+
+    if (dupCount) {
+      showImportToast("warn",
+        `⚠️ <strong>${dupCount} CNPJ(s) repetido(s) na planilha</strong> — só a primeira ocorrência será cadastrada. ` +
+        `Veja na coluna "Erro / observação" qual linha é a original.`);
+    }
     renderTable();
   } catch (err) {
     showImportToast("error", `❌ Erro lendo planilha: <code>${err.message}</code>`);
@@ -1044,7 +1072,13 @@ $("btn-validate").addEventListener("click", async () => {
 // Cadastrar todos no SAP (sequencial, 1 POST por linha)
 $("btn-bulk-submit").addEventListener("click", async () => {
   if (!IMPORT_ROWS.length) return;
-  if (!confirm(`Confirma cadastrar ${IMPORT_ROWS.length} BP(s) no SAP V4 (1410)?\n\nSerão ${IMPORT_ROWS.length} chamada(s) sequencial(is) no n8n.`)) return;
+  const sendable = IMPORT_ROWS.filter(r => r.status_sap !== "ok" && r.status_sap !== "skip").length;
+  const dupSkipped = IMPORT_ROWS.filter(r => r.status_sap === "skip").length;
+  const alreadyOk  = IMPORT_ROWS.filter(r => r.status_sap === "ok").length;
+  let msg = `Confirma cadastrar ${sendable} BP(s) no SAP V4 (1410)?`;
+  if (dupSkipped) msg += `\n\n• ${dupSkipped} linha(s) duplicada(s) na planilha serão puladas.`;
+  if (alreadyOk)  msg += `\n• ${alreadyOk} linha(s) já cadastrada(s) anteriormente serão puladas.`;
+  if (!confirm(msg)) return;
   hideImportToast();
   const btn = $("btn-bulk-submit");
   btn.disabled = true;
@@ -1056,6 +1090,12 @@ $("btn-bulk-submit").addEventListener("click", async () => {
     const item = IMPORT_ROWS[i];
     // pula linhas já cadastradas com sucesso (re-execução)
     if (item.status_sap === "ok" && item.sap_bp_number) {
+      processed++;
+      btn.textContent = `Cadastrando... ${processed}/${total}`;
+      continue;
+    }
+    // pula linhas marcadas como duplicadas dentro da planilha
+    if (item.status_sap === "skip") {
       processed++;
       btn.textContent = `Cadastrando... ${processed}/${total}`;
       continue;
