@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Cadastrar BP no SAP V4 · Crxate</title>
+<title>Cadastrar BP no SAP · Crxate</title>
 <style>
   :root {
     --bg: #0A0A0A;
@@ -252,6 +252,23 @@
   .pill.fail    { background: var(--danger-dim); color: var(--danger); }
   .pill.skip    { background: rgba(100,116,139,0.2); color: var(--text-dim); }
 
+  /* Company selector tiles */
+  .company-list { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+  .company-tile {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; background: var(--surface);
+    border-radius: 8px; border: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .company-tile:hover { background: var(--surface-hover); }
+  .company-tile.active { border-color: var(--accent); background: var(--accent-dim); }
+  .company-tile input { width: auto; margin: 0; }
+  .company-tile .text strong { display: block; font-size: 14px; }
+  .company-tile .text small { color: var(--text-muted); font-size: 11px; }
+  .company-tile.active .text small { color: var(--accent); }
+  @media (max-width: 720px) { .company-list { grid-template-columns: 1fr 1fr; } }
+
   .stats {
     display: grid; grid-template-columns: repeat(5, 1fr);
     gap: 8px; margin-top: 12px;
@@ -276,9 +293,35 @@
 <div class="container">
 
   <header>
-    <h1>Cadastrar Business Partner <span class="badge">SAP V4 Company · 1410</span></h1>
-    <p>Cadastro de BPs direto no SAP via iFlow. <strong>Avulso</strong> para 1 BP manual ou <strong>Import</strong> para uma planilha de CNPJs (validação Receita + cadastro em lote).</p>
+    <h1>Cadastrar Business Partner <span class="badge">multi-empresa</span></h1>
+    <p>Cadastro de BPs direto no SAP via iFlow. Selecione 1 ou mais empresas, depois use <strong>Avulso</strong> (1 BP manual) ou <strong>Import</strong> (planilha de CNPJs com validação Receita + cadastro em lote).</p>
   </header>
+
+  <div class="card">
+    <h2>Empresas destino <span style="color:var(--danger)">*</span> <small style="color:var(--text-muted); font-weight:400;">o BP será cadastrado em cada empresa selecionada</small></h2>
+    <div class="company-list">
+      <label class="company-tile" data-code="1410">
+        <input type="checkbox" name="company" value="1410" />
+        <div class="text"><strong>V4 Company</strong><small>1410</small></div>
+      </label>
+      <label class="company-tile" data-code="1420">
+        <input type="checkbox" name="company" value="1420" />
+        <div class="text"><strong>Staage</strong><small>1420</small></div>
+      </label>
+      <label class="company-tile" data-code="1430">
+        <input type="checkbox" name="company" value="1430" />
+        <div class="text"><strong>Franchise</strong><small>1430</small></div>
+      </label>
+      <label class="company-tile" data-code="1440">
+        <input type="checkbox" name="company" value="1440" />
+        <div class="text"><strong>EasyFlow</strong><small>1440</small></div>
+      </label>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button type="button" id="btn-all-companies" class="secondary" style="flex:none; padding:6px 12px; font-size:12px;">Todas</button>
+      <button type="button" id="btn-no-companies" class="secondary" style="flex:none; padding:6px 12px; font-size:12px;">Limpar</button>
+    </div>
+  </div>
 
   <div class="tabs">
     <button type="button" class="tab active" data-tab="avulso">Avulso</button>
@@ -368,7 +411,7 @@
 
     <div class="actions">
       <button type="button" id="btn-reset" class="secondary">Limpar</button>
-      <button type="submit" id="btn-submit">🚀 Cadastrar no SAP</button>
+      <button type="submit" id="btn-submit">🚀 Cadastrar nas empresas selecionadas</button>
     </div>
 
     <div id="toast" class="toast"></div>
@@ -434,6 +477,7 @@
           <thead>
             <tr>
               <th>#</th>
+              <th>Empresa</th>
               <th>CNPJ/CPF</th>
               <th>Tipo</th>
               <th>Razão social</th>
@@ -481,6 +525,35 @@ const FALLBACK_V4 = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+const COMPANY_NAMES = {
+  "1410": "V4 Company",
+  "1420": "Staage",
+  "1430": "Franchise",
+  "1440": "EasyFlow",
+};
+
+function getSelectedCompanies() {
+  return Array.from(document.querySelectorAll('input[name="company"]:checked')).map((el) => el.value);
+}
+
+// Tile visual state
+document.querySelectorAll(".company-tile").forEach((tile) => {
+  const chk = tile.querySelector('input[type="checkbox"]');
+  const sync = () => tile.classList.toggle("active", chk.checked);
+  chk.addEventListener("change", () => { sync(); if (typeof updatePreview === "function") updatePreview(); });
+  sync();
+});
+$("btn-all-companies").addEventListener("click", () => {
+  document.querySelectorAll('input[name="company"]').forEach((el) => {
+    el.checked = true; el.dispatchEvent(new Event("change"));
+  });
+});
+$("btn-no-companies").addEventListener("click", () => {
+  document.querySelectorAll('input[name="company"]').forEach((el) => {
+    el.checked = false; el.dispatchEvent(new Event("change"));
+  });
+});
 
 // ===== Tabs =====
 document.querySelectorAll(".tab").forEach((btn) => {
@@ -551,7 +624,7 @@ function applyReceitaToObj(target, d) {
   return out;
 }
 
-function buildBpPayload(row, { useFallbackIfMissing = false, source_id } = {}) {
+function buildBpPayload(row, { useFallbackIfMissing = false, source_id, company_code } = {}) {
   const docInfo = detectDocType(row.cnpj_cpf);
   const cnpjCpf = onlyDigits(row.cnpj_cpf);
   const isPj = docInfo.tipo === "PJ";
@@ -574,8 +647,12 @@ function buildBpPayload(row, { useFallbackIfMissing = false, source_id } = {}) {
     state = state || FALLBACK_V4.state;
   }
 
+  const cc = company_code || "1410";
+  const sid = source_id || (cnpjCpf ? `${cnpjCpf}-${cc}` : null);
+
   return {
     payload: {
+      company_code: cc,
       document_number: cnpjCpf || null,
       cnpj_cpf: cnpjCpf || null,
       full_name: (row.full_name || "").trim(),
@@ -591,7 +668,7 @@ function buildBpPayload(row, { useFallbackIfMissing = false, source_id } = {}) {
       city: (city || "").trim() || null,
       state: ((state || "").trim().toUpperCase()) || null,
       country: "BR",
-      source_id: source_id || cnpjCpf || null,
+      source_id: sid,
       address_is_fallback: usedFallback,
     },
     docInfo,
@@ -729,8 +806,8 @@ $("use_fallback").addEventListener("change", (e) => {
   updatePreview();
 });
 
-function buildAvulsoPayload() {
-  const row = {
+function buildAvulsoRow() {
+  return {
     cnpj_cpf: $("cnpj_cpf").value,
     full_name: $("full_name").value,
     email: $("email").value,
@@ -741,14 +818,27 @@ function buildAvulsoPayload() {
     city: $("city").value,
     state: $("state").value,
   };
+}
+function buildAvulsoPayloads() {
+  const row = buildAvulsoRow();
   const useFallback = $("use_fallback").checked;
-  const { payload } = buildBpPayload(row, { useFallbackIfMissing: false });
-  payload.address_is_fallback = useFallback;
-  return payload;
+  const companies = getSelectedCompanies();
+  if (!companies.length) {
+    const { payload } = buildBpPayload(row, { company_code: "(selecione uma empresa)" });
+    payload.address_is_fallback = useFallback;
+    return [payload];
+  }
+  return companies.map((cc) => {
+    const { payload } = buildBpPayload(row, { company_code: cc });
+    payload.address_is_fallback = useFallback;
+    return payload;
+  });
 }
 
 function updatePreview() {
-  $("json-preview").textContent = JSON.stringify(buildAvulsoPayload(), null, 2);
+  const payloads = buildAvulsoPayloads();
+  const preview = payloads.length === 1 ? payloads[0] : { bps: payloads };
+  $("json-preview").textContent = JSON.stringify(preview, null, 2);
 }
 ["full_name", "email", "phone", "street", "house_number", "city", "state"]
   .forEach((id) => $(id).addEventListener("input", updatePreview));
@@ -757,62 +847,75 @@ updatePreview();
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   hideToast();
-  const payload = buildAvulsoPayload();
+  const companies = getSelectedCompanies();
+  if (!companies.length) { showToast("error", "Selecione pelo menos 1 empresa destino no topo da página."); return; }
   const docInfo = detectDocType($("cnpj_cpf").value);
   if (!docInfo.tipo) { showToast("error", "CNPJ/CPF inválido. Use 11 dígitos (CPF) ou 14 (CNPJ)."); return; }
-  if (!payload.full_name) { showToast("error", "Nome / Razão Social é obrigatório."); return; }
-  if (!payload.zip_code || !payload.street || !payload.city || !payload.state) {
+  const row = buildAvulsoRow();
+  if (!row.full_name.trim()) { showToast("error", "Nome / Razão Social é obrigatório."); return; }
+  const useFallback = $("use_fallback").checked;
+  if (!row.zip_code || !row.street || !row.city || !row.state) {
     showToast("warn", "Endereço incompleto. Marque <strong>“Usar endereço fallback V4”</strong> ou preencha CEP/rua/cidade/UF.");
     return;
   }
 
   const btn = $("btn-submit");
-  btn.disabled = true; btn.textContent = "Enviando ao SAP...";
+  btn.disabled = true;
+  const results = [];
 
-  try {
-    const resp = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json", "X-API-Key": API_KEY },
-      body: JSON.stringify({ bps: [payload] }),
-    });
-    const text = await resp.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = { raw: text }; }
-    if (Array.isArray(data) && data.length) data = data[0];
-
-    if (!resp.ok) {
-      showToast("error", `❌ HTTP ${resp.status}: <code>${(text || "").slice(0, 200)}</code>`);
-      return;
+  for (let i = 0; i < companies.length; i++) {
+    const cc = companies[i];
+    btn.textContent = `Enviando ${i+1}/${companies.length} (${COMPANY_NAMES[cc]})...`;
+    const { payload } = buildBpPayload(row, { company_code: cc });
+    payload.address_is_fallback = useFallback;
+    try {
+      const resp = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json", "X-API-Key": API_KEY },
+        body: JSON.stringify({ bps: [payload] }),
+      });
+      const text = await resp.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { raw: text }; }
+      if (Array.isArray(data) && data.length) data = data[0];
+      if (!resp.ok) {
+        results.push({ cc, ok: false, error: `HTTP ${resp.status}: ${(text||"").slice(0,150)}` });
+      } else {
+        const first = (data.details || [])[0] || {};
+        if (first.sap_bp_number) {
+          results.push({ cc, ok: true, sap_bp: first.sap_bp_number, tax_ok: first.tax_ok, already: first.already_exists });
+        } else {
+          results.push({ cc, ok: false, error: (first.error || "sem detalhes").slice(0, 200) });
+        }
+      }
+    } catch (err) {
+      results.push({ cc, ok: false, error: "conexão: " + err.message });
     }
-    const succeeded = data.succeeded || 0;
-    const details = data.details || [];
-    const first = details[0] || {};
-    const sapBp = first.sap_bp_number;
-    const taxOk = first.tax_ok;
-    const errMsg = first.error;
-    if (succeeded > 0 && sapBp) {
-      showToast("success",
-        `✅ <strong>BP cadastrado no SAP V4!</strong><br>` +
-        `Número: <code>${sapBp}</code> &nbsp;·&nbsp; ` +
-        `Tax Number: ${taxOk ? "✅ gravado" : (taxOk === false ? "⚠️ falhou" : "—")}<br>` +
-        `<small>Confira no Fiori → Exibir Lista de Clientes → Cliente = <code>${sapBp}</code></small>`
-      );
-      $("cnpj_cpf").value = ""; $("full_name").value = "";
-      $("email").value = ""; $("phone").value = "";
-      $("doc-type").className = "doc-type"; $("doc-type").textContent = "";
-      $("tipo_display").value = "";
-      updatePreview(); $("cnpj_cpf").focus();
-    } else {
-      showToast("error",
-        `❌ <strong>BP NÃO cadastrado.</strong><br>` +
-        `Erro: <code>${(errMsg || "sem detalhes").slice(0, 300)}</code>`
-      );
-    }
-  } catch (err) {
-    showToast("error", `❌ Erro de conexão: <code>${err.message}</code>`);
-  } finally {
-    btn.disabled = false; btn.textContent = "🚀 Cadastrar no SAP";
   }
+
+  const okN = results.filter(r => r.ok).length;
+  const failN = results.filter(r => !r.ok).length;
+  const lines = results.map(r => {
+    const name = `<strong>${COMPANY_NAMES[r.cc]}</strong> <small style="color:var(--text-muted)">(${r.cc})</small>`;
+    if (r.ok) {
+      const tag = r.already ? "↪ já existia" : "✅ cadastrado";
+      const tax = r.tax_ok === true ? " · Tax ✅" : (r.tax_ok === false ? " · Tax ⚠️" : "");
+      return `<div class="result-row ok" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;background:rgba(0,0,0,0.25);margin-top:6px;border-left:3px solid var(--accent);">${name}<span>${tag} BP <code>${r.sap_bp}</code>${tax}</span></div>`;
+    }
+    return `<div class="result-row fail" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;background:rgba(0,0,0,0.25);margin-top:6px;border-left:3px solid var(--danger);">${name}<span>❌ <code>${(r.error||"").slice(0,160)}</code></span></div>`;
+  }).join("");
+  const headType = failN === 0 ? "success" : (okN > 0 ? "warn" : "error");
+  const headIcon = failN === 0 ? "✅" : (okN > 0 ? "⚠️" : "❌");
+  showToast(headType, `${headIcon} <strong>${okN} sucesso(s) · ${failN} falha(s)</strong>${lines}`);
+
+  if (failN === 0) {
+    $("cnpj_cpf").value = ""; $("full_name").value = "";
+    $("email").value = ""; $("phone").value = "";
+    $("doc-type").className = "doc-type"; $("doc-type").textContent = "";
+    $("tipo_display").value = "";
+    updatePreview(); $("cnpj_cpf").focus();
+  }
+  btn.disabled = false; btn.textContent = "🚀 Cadastrar nas empresas selecionadas";
 });
 
 $("btn-reset").addEventListener("click", () => {
@@ -890,13 +993,15 @@ function renderTable() {
     });
     const sapBadge = pillFor(r.status_sap, {
       pending: "—", running: "enviando…",
-      ok: "✅ cadastrado", fail: "❌ erro",
+      ok: r._meta?.already_exists ? "↪ já existia" : "✅ cadastrado", fail: "❌ erro",
       skip: "↪ duplicado",
     });
+    const companyLabel = `<strong>${COMPANY_NAMES[r.company_code] || r.company_code}</strong><br><small style="color:var(--text-muted)">${r.company_code}</small>`;
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${i + 1}</td>
+      <td>${r.line || (i + 1)}</td>
+      <td>${companyLabel}</td>
       <td>${formatCnpjCpf(r.row.cnpj_cpf || "") || "—"}</td>
       <td><span class="doc-type ${docInfo.tipo ? docInfo.tipo.toLowerCase() : 'invalid'}">${tipo}</span></td>
       <td class="razao" title="${escapeAttr(r.row.full_name || "")}">${escapeHtml(r.row.full_name || "—")}</td>
@@ -950,54 +1055,66 @@ async function handleFile(file) {
         `Aceito: <code>${COLUMN_ALIASES.cnpj_cpf.join(", ")}</code>`);
       return;
     }
+    const companies = getSelectedCompanies();
+    if (!companies.length) {
+      showImportToast("error", "Selecione pelo menos 1 empresa destino no topo da página antes de subir a planilha.");
+      return;
+    }
+
     IMPORT_ROWS = [];
     let skipped = 0;
+    // Pra cada linha da planilha, gera N entries (1 por empresa selecionada)
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       const raw = {};
       for (const [field, idx] of Object.entries(map)) raw[field] = (r[idx] || "").toString().trim();
       if (!raw.cnpj_cpf || !onlyDigits(raw.cnpj_cpf)) { skipped++; continue; }
-      IMPORT_ROWS.push({
-        row: raw,
-        status_receita: "pending",
-        status_sap: "pending",
-        sap_bp_number: null,
-        error: null,
-        _meta: {},
-      });
+      const lineNumber = i;
+      for (const cc of companies) {
+        IMPORT_ROWS.push({
+          line: lineNumber,
+          company_code: cc,
+          row: raw,
+          status_receita: "pending",
+          status_sap: "pending",
+          sap_bp_number: null,
+          error: null,
+          _meta: {},
+        });
+      }
     }
     if (!IMPORT_ROWS.length) {
       showImportToast("error", "Nenhuma linha válida (faltou CNPJ/CPF em todas).");
       return;
     }
 
-    // Dedup local: marca duplicatas dentro da própria planilha
-    const seen = new Map(); // cnpj_normalizado -> primeira linha (1-based)
+    // Dedup local: chave = (cnpj, empresa). Mantém primeira ocorrência por par.
+    const seen = new Map(); // "cnpj|company" -> indice
     let dupCount = 0;
     IMPORT_ROWS.forEach((item, idx) => {
-      const key = onlyDigits(item.row.cnpj_cpf);
-      const lineNum = idx + 1;
+      const key = onlyDigits(item.row.cnpj_cpf) + "|" + item.company_code;
       if (seen.has(key)) {
         item.status_sap = "skip";
-        item.error = `Duplicado na planilha — já aparece na linha ${seen.get(key)}`;
+        item.error = `Duplicado na planilha (linha ${IMPORT_ROWS[seen.get(key)].line}) p/ ${COMPANY_NAMES[item.company_code]}`;
         item._meta.dup_in_sheet = true;
         dupCount++;
       } else {
-        seen.set(key, lineNum);
+        seen.set(key, idx);
       }
     });
 
     $("card-preview").style.display = "block";
-    let countMsg = `(${IMPORT_ROWS.length} linha(s) carregada(s)`;
-    if (skipped) countMsg += ` · ${skipped} ignorada(s) sem CNPJ/CPF`;
-    if (dupCount) countMsg += ` · ${dupCount} duplicada(s) na planilha`;
+    const distinctLines = new Set(IMPORT_ROWS.map(r => r.line)).size;
+    let countMsg = `(${distinctLines} linha(s) × ${companies.length} empresa(s) = ${IMPORT_ROWS.length} cadastro(s)`;
+    if (skipped) countMsg += ` · ${skipped} linha(s) ignorada(s) sem CNPJ/CPF`;
+    if (dupCount) countMsg += ` · ${dupCount} duplicada(s)`;
     countMsg += `)`;
     $("preview-count").textContent = countMsg;
 
     if (dupCount) {
       showImportToast("warn",
-        `⚠️ <strong>${dupCount} CNPJ(s) repetido(s) na planilha</strong> — só a primeira ocorrência será cadastrada. ` +
-        `Veja na coluna "Erro / observação" qual linha é a original.`);
+        `⚠️ <strong>${dupCount} cadastro(s) duplicado(s)</strong> serão pulados. ` +
+        `Veja "Erro / observação" pra ver a linha original.`);
     }
     renderTable();
   } catch (err) {
@@ -1020,55 +1137,62 @@ dz.addEventListener("drop", (e) => {
   if (e.dataTransfer?.files?.[0]) handleFile(e.dataTransfer.files[0]);
 });
 
-// Validar Receita (sequencial)
+// Validar Receita (sequencial, com cache por CNPJ pra evitar N chamadas se >1 empresa)
 $("btn-validate").addEventListener("click", async () => {
   if (!IMPORT_ROWS.length) return;
   hideImportToast();
   const btn = $("btn-validate");
   btn.disabled = true;
-  let processed = 0, ok = 0, fail = 0;
-  const total = IMPORT_ROWS.length;
 
-  for (let i = 0; i < IMPORT_ROWS.length; i++) {
-    const item = IMPORT_ROWS[i];
+  // CNPJs únicos pra consultar
+  const uniqueCnpjs = new Map(); // cnpj -> { result } | null
+  for (const item of IMPORT_ROWS) {
     const docInfo = detectDocType(item.row.cnpj_cpf);
-    if (docInfo.tipo !== "PJ") {
-      item.status_receita = "skip";
-      processed++;
-      btn.textContent = `Validando... ${processed}/${total}`;
-      renderTable();
-      continue;
-    }
-    item.status_receita = "running";
-    renderTable();
+    if (docInfo.tipo === "PJ") uniqueCnpjs.set(onlyDigits(item.row.cnpj_cpf), null);
+  }
+  const cnpjList = Array.from(uniqueCnpjs.keys());
+  const totalCnpjs = cnpjList.length;
+  let processed = 0, ok = 0, fail = 0;
+
+  for (const cnpj of cnpjList) {
     try {
-      const r = await fetchBrasilApiCnpj(onlyDigits(item.row.cnpj_cpf));
-      if (r.ok) {
-        item.row = applyReceitaToObj(item.row, r.data);
-        item._meta.situacao = r.data.descricao_situacao_cadastral || null;
-        item.status_receita = "ok";
-        ok++;
-      } else {
-        item.status_receita = "fail";
-        item.error = `Receita HTTP ${r.status}: ${r.error}`;
-        fail++;
-      }
+      const r = await fetchBrasilApiCnpj(cnpj);
+      uniqueCnpjs.set(cnpj, r);
+      if (r.ok) ok++; else fail++;
     } catch (err) {
-      item.status_receita = "fail";
-      item.error = `Receita erro: ${err.message}`;
+      uniqueCnpjs.set(cnpj, { ok: false, error: err.message });
       fail++;
     }
     processed++;
-    btn.textContent = `Validando... ${processed}/${total}`;
-    renderTable();
-    await sleep(350); // throttle BrasilAPI
+    btn.textContent = `Validando... ${processed}/${totalCnpjs} CNPJ(s) únicos`;
+    await sleep(350);
   }
+
+  // Aplica resultado em TODAS as entries
+  for (const item of IMPORT_ROWS) {
+    const docInfo = detectDocType(item.row.cnpj_cpf);
+    if (docInfo.tipo !== "PJ") {
+      item.status_receita = "skip";
+      continue;
+    }
+    const r = uniqueCnpjs.get(onlyDigits(item.row.cnpj_cpf));
+    if (r && r.ok) {
+      item.row = applyReceitaToObj(item.row, r.data);
+      item._meta.situacao = r.data.descricao_situacao_cadastral || null;
+      item.status_receita = "ok";
+    } else if (r) {
+      item.status_receita = "fail";
+      item.error = `Receita: ${r.error || ("HTTP " + r.status)}`;
+    }
+  }
+  renderTable();
 
   btn.disabled = false;
   btn.textContent = "🔎 Validar todos na Receita";
+  const cpfsSkipped = IMPORT_ROWS.filter(r => r.status_receita === 'skip').length;
   showImportToast(fail ? "warn" : "success",
-    `✅ <strong>${ok}</strong> validado(s) na Receita · ${fail} falha(s)` +
-    (IMPORT_ROWS.some(r => r.status_receita === "skip") ? ` · ${IMPORT_ROWS.filter(r=>r.status_receita==='skip').length} CPF(s) ignorados (Receita só CNPJ)` : "")
+    `✅ <strong>${ok}</strong> CNPJ(s) validado(s) · ${fail} falha(s)` +
+    (cpfsSkipped ? ` · ${cpfsSkipped} entries de CPF ignoradas (Receita só CNPJ)` : "")
   );
 });
 
@@ -1078,9 +1202,10 @@ $("btn-bulk-submit").addEventListener("click", async () => {
   const sendable = IMPORT_ROWS.filter(r => r.status_sap !== "ok" && r.status_sap !== "skip").length;
   const dupSkipped = IMPORT_ROWS.filter(r => r.status_sap === "skip").length;
   const alreadyOk  = IMPORT_ROWS.filter(r => r.status_sap === "ok").length;
-  let msg = `Confirma cadastrar ${sendable} BP(s) no SAP V4 (1410)?`;
-  if (dupSkipped) msg += `\n\n• ${dupSkipped} linha(s) duplicada(s) na planilha serão puladas.`;
-  if (alreadyOk)  msg += `\n• ${alreadyOk} linha(s) já cadastrada(s) anteriormente serão puladas.`;
+  const companiesUsed = [...new Set(IMPORT_ROWS.map(r => r.company_code))];
+  let msg = `Confirma cadastrar ${sendable} BP(s) nas empresas ${companiesUsed.join(", ")}?`;
+  if (dupSkipped) msg += `\n\n• ${dupSkipped} cadastro(s) duplicado(s) na planilha serão pulados.`;
+  if (alreadyOk)  msg += `\n• ${alreadyOk} cadastro(s) já bem-sucedidos antes serão pulados.`;
   if (!confirm(msg)) return;
   hideImportToast();
   const btn = $("btn-bulk-submit");
@@ -1120,7 +1245,7 @@ $("btn-bulk-submit").addEventListener("click", async () => {
       continue;
     }
 
-    const built = buildBpPayload(item.row, { useFallbackIfMissing: useFallback });
+    const built = buildBpPayload(item.row, { useFallbackIfMissing: useFallback, company_code: item.company_code });
     if (!built.addressComplete) {
       item.status_sap = "fail";
       item.error = "Endereço incompleto (CEP/rua/cidade/UF). Marque fallback ou preencha na planilha.";
@@ -1154,7 +1279,8 @@ $("btn-bulk-submit").addEventListener("click", async () => {
           item.status_sap = "ok";
           item.sap_bp_number = first.sap_bp_number;
           item._meta.tax_ok = first.tax_ok;
-          item.error = null;
+          item._meta.already_exists = !!first.already_exists;
+          item.error = first.already_exists ? "BP já existia" : null;
           ok++;
         } else {
           item.status_sap = "fail";
@@ -1194,11 +1320,14 @@ $("btn-clear-import").addEventListener("click", () => {
 // Export CSV
 $("btn-export").addEventListener("click", () => {
   if (!IMPORT_ROWS.length) return;
-  const cols = ["cnpj_cpf", "tipo", "full_name", "email", "phone", "zip_code", "street", "house_number", "city", "state", "status_receita", "status_sap", "sap_bp_number", "tax_ok", "error"];
+  const cols = ["linha", "company_code", "company_name", "cnpj_cpf", "tipo", "full_name", "email", "phone", "zip_code", "street", "house_number", "city", "state", "status_receita", "status_sap", "sap_bp_number", "already_exists", "tax_ok", "error"];
   const lines = [cols.join(",")];
   for (const r of IMPORT_ROWS) {
     const tipo = detectDocType(r.row.cnpj_cpf).tipo || "";
     const vals = [
+      r.line || "",
+      r.company_code || "",
+      COMPANY_NAMES[r.company_code] || "",
       onlyDigits(r.row.cnpj_cpf),
       tipo,
       r.row.full_name || "",
@@ -1212,6 +1341,7 @@ $("btn-export").addEventListener("click", () => {
       r.status_receita || "",
       r.status_sap || "",
       r.sap_bp_number || "",
+      r._meta?.already_exists ? "true" : "",
       r._meta?.tax_ok ?? "",
       r.error || "",
     ];
