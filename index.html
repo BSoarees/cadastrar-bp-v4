@@ -405,6 +405,11 @@
           <small>Se Receita não trouxer endereço completo e a planilha também não tiver, usa R. Sergio Fernandes Borges Soares, 1000 — Campinas/SP.</small>
         </div>
       </label>
+
+      <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" id="btn-template-xlsx" class="secondary" style="flex:none; padding:8px 14px; font-size:12px;">⬇️ Baixar template (.xlsx)</button>
+        <button type="button" id="btn-template-csv" class="secondary" style="flex:none; padding:8px 14px; font-size:12px;">⬇️ Baixar template (.csv)</button>
+      </div>
     </div>
 
     <div class="card" id="card-preview" style="display:none;">
@@ -1182,6 +1187,103 @@ function csvCell(v) {
   if (/[",\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
+
+// ===== Templates =====
+const TEMPLATE_COLUMNS = [
+  "cnpj_cpf", "full_name", "email", "phone",
+  "zip_code", "street", "house_number", "city", "state"
+];
+const TEMPLATE_SAMPLE_ROWS = [
+  {
+    cnpj_cpf: "00000000000191",
+    full_name: "BANCO DO BRASIL SA",
+    email: "contato@bb.com.br",
+    phone: "(61) 3493-9002",
+    zip_code: "70073-901",
+    street: "Setor Bancario Sul Quadra 1 Bloco G",
+    house_number: "S/N",
+    city: "Brasilia",
+    state: "DF",
+  },
+  {
+    cnpj_cpf: "",
+    full_name: "",
+    email: "",
+    phone: "",
+    zip_code: "",
+    street: "",
+    house_number: "",
+    city: "",
+    state: "",
+  },
+];
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+$("btn-template-xlsx").addEventListener("click", () => {
+  const ws = XLSX.utils.json_to_sheet(TEMPLATE_SAMPLE_ROWS, { header: TEMPLATE_COLUMNS });
+  // Largura sugerida das colunas
+  ws["!cols"] = [
+    { wch: 18 }, { wch: 32 }, { wch: 26 }, { wch: 18 },
+    { wch: 12 }, { wch: 32 }, { wch: 10 }, { wch: 18 }, { wch: 4 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "BPs");
+
+  // Aba de instruções
+  const instr = [
+    ["Template de importação de BPs no SAP V4 (1410)"],
+    [""],
+    ["Como usar:"],
+    ["1. Preencha pelo menos a coluna cnpj_cpf (CNPJ com 14 dígitos ou CPF com 11)."],
+    ["2. As demais colunas são opcionais — se vazias, são preenchidas pela BrasilAPI (só CNPJ)."],
+    ["3. Se preenchidas, sobrescrevem o que vem da Receita."],
+    ["4. Salve como .xlsx ou .csv e faça upload no site."],
+    [""],
+    ["Colunas:"],
+    ["cnpj_cpf",     "Obrigatório. Aceita com ou sem máscara. CNPJ=14 dígitos, CPF=11."],
+    ["full_name",    "Nome ou Razão Social. Para PJ, vem da Receita se vazio."],
+    ["email",        "Opcional."],
+    ["phone",        "Telefone com DDD. Ex.: (11) 99999-9999."],
+    ["zip_code",     "CEP. Ex.: 01310-100."],
+    ["street",       "Rua / logradouro."],
+    ["house_number", "Número. Use S/N se não tiver."],
+    ["city",         "Cidade."],
+    ["state",        "UF (2 letras maiúsculas). Ex.: SP."],
+    [""],
+    ["Aliases aceitos (case insensitive, sem acento):"],
+    ["• cnpj_cpf  →  cnpj, cpf, documento, doc"],
+    ["• full_name →  razao_social, razão social, nome"],
+    ["• phone     →  telefone, tel, celular"],
+    ["• zip_code  →  cep"],
+    ["• street    →  rua, logradouro, endereco"],
+    ["• house_number → numero, num, number"],
+    ["• city      →  cidade, municipio"],
+    ["• state     →  uf, estado"],
+  ];
+  const wsInstr = XLSX.utils.aoa_to_sheet(instr);
+  wsInstr["!cols"] = [{ wch: 20 }, { wch: 70 }];
+  XLSX.utils.book_append_sheet(wb, wsInstr, "Instruções");
+
+  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  triggerDownload(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+    "template-cadastro-bps-v4.xlsx");
+});
+
+$("btn-template-csv").addEventListener("click", () => {
+  const lines = [TEMPLATE_COLUMNS.join(",")];
+  for (const r of TEMPLATE_SAMPLE_ROWS) {
+    lines.push(TEMPLATE_COLUMNS.map((c) => csvCell(r[c])).join(","));
+  }
+  triggerDownload(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }),
+    "template-cadastro-bps-v4.csv");
+});
 </script>
 </body>
 </html>
