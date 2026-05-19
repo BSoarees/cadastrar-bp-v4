@@ -468,6 +468,9 @@
 <script>
 const WEBHOOK_URL = "https://n8n.main.mktlab.app/webhook/v4-cadastrar-bps";
 const API_KEY = "4a359b8cc417413c9a2e1b13a086788b";
+// Proxy n8n pra contornar CORS/firewall corporativo bloqueando BrasilAPI e ViaCEP
+const BRASILAPI_PROXY = "https://n8n.main.mktlab.app/webhook/brasilapi-cnpj";
+const VIACEP_PROXY    = "https://n8n.main.mktlab.app/webhook/viacep";
 
 const FALLBACK_V4 = {
   zip_code: "13054-709",
@@ -522,7 +525,7 @@ function formatPhone(raw) {
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function fetchBrasilApiCnpj(cnpjDigits) {
-  const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjDigits}`);
+  const resp = await fetch(`${BRASILAPI_PROXY}?cnpj=${cnpjDigits}`);
   if (!resp.ok) {
     const txt = await resp.text();
     return { ok: false, status: resp.status, error: (txt || "").slice(0, 200) };
@@ -692,7 +695,7 @@ $("btn-cep").addEventListener("click", async () => {
   hideToast();
   $("btn-cep").disabled = true; $("btn-cep").textContent = "Buscando...";
   try {
-    const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const resp = await fetch(`${VIACEP_PROXY}?cep=${cep}`);
     const data = await resp.json();
     if (data.erro) { showToast("warn", "CEP não encontrado no ViaCEP."); }
     else {
