@@ -348,6 +348,15 @@
     </div>
   </div>
 
+  <!-- Painel de BPs cadastrados (persistente entre reloads) -->
+  <div id="bps-cadastrados-panel" class="card" style="display:none; border-color:var(--accent-border); background:linear-gradient(135deg, var(--accent-dim), rgba(255,255,255,0.7));">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <h2 style="margin:0;">BPs cadastrados recentemente <small id="bps-cadastrados-count" style="color:var(--accent);"></small></h2>
+      <button type="button" id="btn-limpar-bps" class="secondary" style="flex:none; padding:6px 14px; font-size:12px;">Limpar histórico local</button>
+    </div>
+    <div id="bps-cadastrados-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:#fff;"></div>
+  </div>
+
   <div class="tabs">
     <button type="button" class="tab active" data-tab="avulso">Avulso</button>
     <button type="button" class="tab" data-tab="import">Import planilha</button>
@@ -540,6 +549,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
 const WEBHOOK_URL = "https://n8n.main.mktlab.app/webhook/v4-cadastrar-bps";
+const SUPABASE_URL = "https://feofcpxfknxbrchkoalf.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlb2ZjcHhma254YnJjaGtvYWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNjQyNTksImV4cCI6MjA4ODc0MDI1OX0.ffroZ8nhmKVdOno53yOC1PzzxfOW832_JIFIB4oDMlI";
+const sbHeaders = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
 const API_KEY = "4a359b8cc417413c9a2e1b13a086788b";
 // Proxy n8n pra contornar CORS/firewall corporativo bloqueando BrasilAPI e ViaCEP
 const BRASILAPI_PROXY = "https://n8n.main.mktlab.app/webhook/brasilapi-cnpj";
@@ -921,6 +933,15 @@ form.addEventListener("submit", async (e) => {
         const first = (data.details || [])[0] || {};
         if (first.sap_bp_number) {
           results.push({ cc, ok: true, sap_bp: first.sap_bp_number, tax_ok: first.tax_ok, already: first.already_exists });
+          if (!first.already_exists) {
+            registrarBP({
+              sap_bp_number: first.sap_bp_number,
+              company_code: cc,
+              company_name: COMPANY_NAMES[cc],
+              document_number: payload.document_number,
+              full_name: payload.full_name
+            });
+          }
         } else {
           results.push({ cc, ok: false, error: (first.error || "sem detalhes").slice(0, 200) });
         }
@@ -1319,6 +1340,15 @@ $("btn-bulk-submit").addEventListener("click", async () => {
           item._meta.tax_ok = first.tax_ok;
           item._meta.already_exists = !!first.already_exists;
           item.error = first.already_exists ? "BP já existia" : null;
+          if (!first.already_exists) {
+            registrarBP({
+              sap_bp_number: first.sap_bp_number,
+              company_code: item.company_code,
+              company_name: COMPANY_NAMES[item.company_code],
+              document_number: built.payload.document_number,
+              full_name: built.payload.full_name
+            });
+          }
           ok++;
         } else {
           item.status_sap = "fail";
@@ -1578,6 +1608,82 @@ $("btn-template-csv").addEventListener("click", () => {
   }
   triggerDownload(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }),
     "template-cadastro-bps-v4.csv");
+});
+
+// ============================================================================
+// Painel de BPs cadastrados (compartilhado entre todos os usuários via Supabase)
+// ============================================================================
+const BPS_KEY = "bps_cadastrados_v1";
+function loadBpsCadastrados(){ try { return JSON.parse(localStorage.getItem(BPS_KEY)||"[]"); } catch(_){ return []; } }
+function saveBpsCadastrados(arr){ try { localStorage.setItem(BPS_KEY, JSON.stringify(arr.slice(0, 100))); } catch(_){} }
+function registrarBP(bp){
+  const arr = loadBpsCadastrados();
+  arr.unshift({ ...bp, cadastrado_em: bp.cadastrado_em || new Date().toISOString() });
+  saveBpsCadastrados(arr);
+  renderBpsCadastrados();
+}
+function renderBpsCadastrados(){
+  const arr = loadBpsCadastrados();
+  const panel = $("bps-cadastrados-panel");
+  const list = $("bps-cadastrados-list");
+  const count = $("bps-cadastrados-count");
+  if(!panel || !list) return;
+  if(arr.length===0){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  count.textContent = `· ${arr.length} BP${arr.length>1?"s":""}`;
+  list.innerHTML = `<table style="font-size:12px;width:100%;border-collapse:collapse;">
+    <thead><tr style="background:rgba(0,0,0,0.02);">
+      <th style="padding:10px 12px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">BP SAP</th>
+      <th style="padding:10px 12px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">Empresa</th>
+      <th style="padding:10px 12px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">CNPJ/CPF</th>
+      <th style="padding:10px 12px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">Nome</th>
+      <th style="padding:10px 12px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">Cadastrado</th>
+    </tr></thead>
+    <tbody>${arr.map(b=>`<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:10px 12px;"><strong style="color:var(--accent); font-size:13px;">${b.sap_bp_number||"—"}</strong></td>
+      <td style="padding:10px 12px;">${b.company_code||"—"} ${b.company_name?'<small style="color:var(--text-muted);">'+b.company_name+'</small>':''}</td>
+      <td style="padding:10px 12px;font-family:monospace;font-size:11px;">${b.document_number||"—"}</td>
+      <td style="padding:10px 12px;">${(b.full_name||"").slice(0,40)}</td>
+      <td style="padding:10px 12px;color:var(--text-muted);">${new Date(b.cadastrado_em).toLocaleString("pt-BR")}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+}
+async function loadHistoricoBPs(){
+  try {
+    const url = new URL(SUPABASE_URL+"/rest/v1/business_partners");
+    url.searchParams.set("select","document_number,sap_bp_number,full_name,company_code,synced_at");
+    url.searchParams.set("sap_bp_number","not.is.null");
+    url.searchParams.set("source_platform","eq.crxate_cockpit");
+    url.searchParams.set("order","synced_at.desc.nullslast");
+    url.searchParams.set("limit","30");
+    const r = await fetch(url, {headers: sbHeaders});
+    if(!r.ok) return;
+    const bps = await r.json();
+    const local = loadBpsCadastrados();
+    const seen = new Set(local.map(b=>String(b.sap_bp_number)+"|"+b.company_code));
+    for(const bp of bps.reverse()){
+      const key = String(bp.sap_bp_number)+"|"+bp.company_code;
+      if(seen.has(key)) continue;
+      registrarBP({
+        sap_bp_number: bp.sap_bp_number,
+        company_code: bp.company_code,
+        company_name: COMPANY_NAMES[bp.company_code]||"",
+        document_number: bp.document_number,
+        full_name: bp.full_name,
+        cadastrado_em: bp.synced_at
+      });
+    }
+  } catch(e){ console.warn("loadHistoricoBPs:", e); }
+}
+document.addEventListener("DOMContentLoaded", ()=>{
+  const btnLimpar = $("btn-limpar-bps");
+  if(btnLimpar) btnLimpar.addEventListener("click", ()=>{
+    if(confirm("Limpar histórico local? (não apaga no SAP nem no Supabase — só some daqui; ao recarregar volta tudo)")){
+      saveBpsCadastrados([]); renderBpsCadastrados();
+    }
+  });
+  renderBpsCadastrados();
+  loadHistoricoBPs();
 });
 
 // ============================================================================
